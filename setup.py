@@ -9,6 +9,7 @@ from sysconfig import get_path
 
 from packaging.specifiers import SpecifierSet
 from pkg_resources import Distribution
+from setuptools import find_packages
 from skbuild import setup
 from skbuild.cmaker import get_cmake_version
 from skbuild.exceptions import SKBuildError
@@ -76,18 +77,7 @@ setup(
     long_description=readme,
     long_description_content_type="text/markdown",
     url="https://github.com/deepmodeling/deepmd-kit",
-    packages=[
-        "deepmd",
-        "deepmd/descriptor",
-        "deepmd/fit",
-        "deepmd/infer",
-        "deepmd/loss",
-        "deepmd/utils",
-        "deepmd/loggers",
-        "deepmd/cluster",
-        "deepmd/entrypoints",
-        "deepmd/op"
-    ],
+    packages=find_packages(),
     python_requires=">=3.6",
     classifiers=[
         "Programming Language :: Python :: 3.6",

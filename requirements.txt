@@ -4,3 +4,4 @@ pyyaml
 dargs
 tqdm
 typing_extensions
+setuptools
