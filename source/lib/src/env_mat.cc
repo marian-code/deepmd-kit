@@ -50,14 +50,14 @@ void env_mat_a (
     for (int nei_iter = sec_a[sec_iter]; nei_iter < sec_a[sec_iter+1]; ++nei_iter) {      
       if (fmt_nlist_a[nei_iter] < 0) break;
       const double * rr = &sel_a_diff[nei_iter][0];
-      double nr2 = dot3(rr, rr);
+      double nr2 = deepmd::dot3(rr, rr);
       double inr = 1./sqrt(nr2);
       double nr = nr2 * inr;
       double inr2 = inr * inr;
       double inr4 = inr2 * inr2;
       double inr3 = inr4 * nr;
       double sw, dsw;
-      spline5_switch(sw, dsw, nr, rmin, rmax);
+      deepmd::spline5_switch(sw, dsw, nr, rmin, rmax);
       int idx_deriv = nei_iter * 4 * 3;	// 4 components time 3 directions
       int idx_value = nei_iter * 4;	// 4 components
       // 4 value components
@@ -92,12 +92,13 @@ void env_mat_a (
 
 
 template<typename FPTYPE> 
-void env_mat_a_cpu (
+void 
+deepmd::
+env_mat_a_cpu (
     std::vector<FPTYPE > &	        descrpt_a,
     std::vector<FPTYPE > &	        descrpt_a_deriv,
     std::vector<FPTYPE > &	        rij_a,
     const std::vector<FPTYPE > &	posi,
-    const int &				ntypes,
     const std::vector<int > &		type,
     const int &				i_idx,
     const std::vector<int > &		fmt_nlist_a,
@@ -128,14 +129,14 @@ void env_mat_a_cpu (
         for (int nei_iter = sec_a[sec_iter]; nei_iter < sec_a[sec_iter+1]; ++nei_iter) {      
             if (fmt_nlist_a[nei_iter] < 0) break;
             const FPTYPE * rr = &rij_a[nei_iter * 3];
-            FPTYPE nr2 = dot3(rr, rr);
+            FPTYPE nr2 = deepmd::dot3(rr, rr);
             FPTYPE inr = 1./sqrt(nr2);
             FPTYPE nr = nr2 * inr;
             FPTYPE inr2 = inr * inr;
             FPTYPE inr4 = inr2 * inr2;
             FPTYPE inr3 = inr4 * nr;
             FPTYPE sw, dsw;
-            spline5_switch(sw, dsw, nr, rmin, rmax);
+            deepmd::spline5_switch(sw, dsw, nr, rmin, rmax);
             int idx_deriv = nei_iter * 4 * 3;	// 4 components time 3 directions
             int idx_value = nei_iter * 4;	// 4 components
             // 4 value components
@@ -216,14 +217,14 @@ void env_mat_r (
     for (int nei_iter = sec[sec_iter]; nei_iter < sec[sec_iter+1]; ++nei_iter) {      
       if (fmt_nlist[nei_iter] < 0) break;
       const double * rr = &sel_diff[nei_iter][0];
-      double nr2 = dot3(rr, rr);
+      double nr2 = deepmd::dot3(rr, rr);
       double inr = 1./sqrt(nr2);
       double nr = nr2 * inr;
       double inr2 = inr * inr;
       double inr4 = inr2 * inr2;
       double inr3 = inr4 * nr;
       double sw, dsw;
-      spline5_switch(sw, dsw, nr, rmin, rmax);
+      deepmd::spline5_switch(sw, dsw, nr, rmin, rmax);
       int idx_deriv = nei_iter * 3;	// 1 components time 3 directions
       int idx_value = nei_iter;		// 1 components
       // value components
@@ -239,12 +240,13 @@ void env_mat_r (
 }
 
 template<typename FPTYPE> 
-void env_mat_r_cpu (
+void 
+deepmd::
+env_mat_r_cpu (
     std::vector<FPTYPE > &		descrpt_a,
     std::vector<FPTYPE > &	        descrpt_a_deriv,
     std::vector<FPTYPE > &	        rij_a,
     const std::vector<FPTYPE > &	posi,
-    const int &				ntypes,
     const std::vector<int > &		type,
     const int &				i_idx,
     const std::vector<int > &		fmt_nlist,
@@ -276,14 +278,14 @@ void env_mat_r_cpu (
         for (int nei_iter = sec[sec_iter]; nei_iter < sec[sec_iter+1]; ++nei_iter) {      
             if (fmt_nlist[nei_iter] < 0) break;
             const FPTYPE * rr = &rij_a[nei_iter * 3];
-            FPTYPE nr2 = dot3(rr, rr);
+            FPTYPE nr2 = deepmd::dot3(rr, rr);
             FPTYPE inr = 1./sqrt(nr2);
             FPTYPE nr = nr2 * inr;
             FPTYPE inr2 = inr * inr;
             FPTYPE inr4 = inr2 * inr2;
             FPTYPE inr3 = inr4 * nr;
             FPTYPE sw, dsw;
-            spline5_switch(sw, dsw, nr, rmin, rmax);
+            deepmd::spline5_switch(sw, dsw, nr, rmin, rmax);
             int idx_deriv = nei_iter * 3;	// 1 components time 3 directions
             int idx_value = nei_iter;	    // 1 components
             // 4 value components
@@ -300,12 +302,13 @@ void env_mat_r_cpu (
 
 
 template
-void env_mat_a_cpu<double> (
+void 
+deepmd::
+env_mat_a_cpu<double> (
     std::vector<double > &	        descrpt_a,
     std::vector<double > &	        descrpt_a_deriv,
     std::vector<double > &	        rij_a,
     const std::vector<double > &	posi,
-    const int &				ntypes,
     const std::vector<int > &		type,
     const int &				i_idx,
     const std::vector<int > &		fmt_nlist,
@@ -315,12 +318,13 @@ void env_mat_a_cpu<double> (
 
 
 template
-void env_mat_a_cpu<float> (
+void 
+deepmd::
+env_mat_a_cpu<float> (
     std::vector<float > &	        descrpt_a,
     std::vector<float > &	        descrpt_a_deriv,
     std::vector<float > &	        rij_a,
     const std::vector<float > &		posi,
-    const int &				ntypes,
     const std::vector<int > &		type,
     const int &				i_idx,
     const std::vector<int > &		fmt_nlist,
@@ -330,12 +334,13 @@ void env_mat_a_cpu<float> (
 
 
 template
-void env_mat_r_cpu<double> (
+void 
+deepmd::
+env_mat_r_cpu<double> (
     std::vector<double > &	        descrpt_r,
     std::vector<double > &	        descrpt_r_deriv,
     std::vector<double > &	        rij_r,
     const std::vector<double > &	posi,
-    const int &				ntypes,
     const std::vector<int > &		type,
     const int &				i_idx,
     const std::vector<int > &		fmt_nlist,
@@ -345,12 +350,13 @@ void env_mat_r_cpu<double> (
 
 
 template
-void env_mat_r_cpu<float> (
+void 
+deepmd::
+env_mat_r_cpu<float> (
     std::vector<float > &	        descrpt_r,
     std::vector<float > &	        descrpt_r_deriv,
     std::vector<float > &	        rij_r,
     const std::vector<float > &		posi,
-    const int &				ntypes,
     const std::vector<int > &		type,
     const int &				i_idx,
     const std::vector<int > &		fmt_nlist,

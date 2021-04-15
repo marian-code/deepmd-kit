@@ -4,6 +4,7 @@
 #include "env_mat.h"
 #include "neighbor_list.h"
 #include "prod_force.h"
+#include "device.h"
 
 class TestProdForceR : public ::testing::Test
 {
@@ -58,13 +59,13 @@ protected:
     rij_a.resize(nloc * nnei * 3);
     for(int ii = 0; ii < nloc; ++ii){      
       // format nlist and record
-      format_nlist_cpu<double>(fmt_nlist_a, posi_cpy, ntypes, atype_cpy, ii, nlist_a_cpy[ii], rc, sec_a);
+      format_nlist_i_cpu<double>(fmt_nlist_a, posi_cpy, atype_cpy, ii, nlist_a_cpy[ii], rc, sec_a);
       for (int jj = 0; jj < nnei; ++jj){
 	nlist[ii*nnei + jj] = fmt_nlist_a[jj];
       }
       std::vector<double > t_env, t_env_deriv, t_rij_a;
       // compute env_mat and its deriv, record
-      env_mat_r_cpu<double>(t_env, t_env_deriv, t_rij_a, posi_cpy, ntypes, atype_cpy, ii, fmt_nlist_a, sec_a, rc_smth, rc);    
+      deepmd::env_mat_r_cpu<double>(t_env, t_env_deriv, t_rij_a, posi_cpy, atype_cpy, ii, fmt_nlist_a, sec_a, rc_smth, rc);    
       for (int jj = 0; jj < ndescrpt; ++jj){
 	env[ii*ndescrpt+jj] = t_env[jj];
 	for (int dd = 0; dd < 3; ++dd){
@@ -85,7 +86,7 @@ TEST_F(TestProdForceR, cpu)
 {
   std::vector<double> force(nall * 3);
   int n_a_sel = nnei;
-  prod_force_r_cpu<double> (&force[0], &net_deriv[0], &env_deriv[0], &nlist[0], nloc, nall, nnei);
+  deepmd::prod_force_r_cpu<double> (&force[0], &net_deriv[0], &env_deriv[0], &nlist[0], nloc, nall, nnei);
   EXPECT_EQ(force.size(), nall * 3);
   EXPECT_EQ(force.size(), expected_force.size());
   for (int jj = 0; jj < force.size(); ++jj){
@@ -96,3 +97,33 @@ TEST_F(TestProdForceR, cpu)
   // }
   // printf("\n");
 }
+
+#if GOOGLE_CUDA
+TEST_F(TestProdForceR, gpu_cuda)
+{
+  std::vector<double> force(nall * 3, 0.0);
+  int n_a_sel = nnei;
+
+  int * nlist_dev = NULL;
+  double * force_dev = NULL, * net_deriv_dev = NULL, * env_deriv_dev = NULL;
+
+  deepmd::malloc_device_memory_sync(nlist_dev, nlist);
+  deepmd::malloc_device_memory_sync(force_dev, force);
+  deepmd::malloc_device_memory_sync(net_deriv_dev, net_deriv);
+  deepmd::malloc_device_memory_sync(env_deriv_dev, env_deriv);
+
+  deepmd::prod_force_r_gpu_cuda<double> (force_dev, net_deriv_dev, env_deriv_dev, nlist_dev, nloc, nall, nnei);
+
+  deepmd::memcpy_device_to_host(force_dev, force);
+  deepmd::delete_device_memory(nlist_dev);
+  deepmd::delete_device_memory(force_dev);
+  deepmd::delete_device_memory(net_deriv_dev);
+  deepmd::delete_device_memory(env_deriv_dev);
+
+  EXPECT_EQ(force.size(), nall * 3);
+  EXPECT_EQ(force.size(), expected_force.size());
+  for (int jj = 0; jj < force.size(); ++jj){
+    EXPECT_LT(fabs(force[jj] - expected_force[jj]) , 1e-5);
+  }  
+}
+#endif // GOOGLE_CUDA

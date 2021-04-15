@@ -1,5 +1,3 @@
-#include <cub/cub.cuh>
-#include <cub/device/device_radix_sort.cuh>
 #include "tabulate.h"
 #include "gpu_cuda.h"
 
@@ -117,7 +115,7 @@ template <
     typename FPTYPE,
     int      MTILE,
     int      KTILE> 
-__global__ void tabulate_fusion__grad_fifth_order_polynomial(
+__global__ void tabulate_fusion_grad_fifth_order_polynomial(
     FPTYPE * dy_dem_x, 
     FPTYPE * dy_dem,   
     const FPTYPE * table, 
@@ -151,7 +149,7 @@ __global__ void tabulate_fusion__grad_fifth_order_polynomial(
     FPTYPE xx = em_x[block_idx * nnei + ii + warp_idx];
     if (ago == xx) { 
       unloop = true;
-      breakpoint = ii;
+      breakpoint = ii + warp_idx;
     }
     
     int table_idx = 0;
@@ -193,6 +191,7 @@ __global__ void tabulate_fusion__grad_fifth_order_polynomial(
   }
 }
 
+namespace deepmd {
 template<typename FPTYPE>
 void tabulate_fusion_gpu_cuda(
     FPTYPE * out,
@@ -229,7 +228,7 @@ void tabulate_fusion_grad_gpu_cuda(
       dy_dem,
       0.0, sizeof(FPTYPE) * nloc * nnei * 4));
 
-  tabulate_fusion__grad_fifth_order_polynomial<FPTYPE, MM, KK> <<<nloc, KK * WARP_SIZE, sizeof(FPTYPE) * MM * last_layer_size>>>(
+  tabulate_fusion_grad_fifth_order_polynomial<FPTYPE, MM, KK> <<<nloc, KK * WARP_SIZE, sizeof(FPTYPE) * MM * last_layer_size>>>(
       dy_dem_x, dy_dem,
       table, em_x, em, dy,  table_info[0], table_info[1], table_info[2], table_info[3], table_info[4], nnei, last_layer_size);
 }
@@ -238,3 +237,4 @@ template void tabulate_fusion_gpu_cuda<float>(float * out, const float * table, 
 template void tabulate_fusion_gpu_cuda<double>(double * out, const double * table, const double * table_info, const double * em_x, const double * em, const int nloc, const int nnei, const int last_layer_size);
 template void tabulate_fusion_grad_gpu_cuda<float> (float * dy_dem_x, float * dy_dem, const float * table, const float * table_info, const float * em_x, const float * em, const float * dy, const int nloc, const int nnei, const int last_layer_size); 
 template void tabulate_fusion_grad_gpu_cuda<double> (double * dy_dem_x, double * dy_dem, const double * table, const double * table_info, const double * em_x, const double * em, const double * dy, const int nloc, const int nnei, const int last_layer_size);
+}

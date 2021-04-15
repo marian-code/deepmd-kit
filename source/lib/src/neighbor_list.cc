@@ -1,4 +1,5 @@
 #include "neighbor_list.h"
+#include "device.h"
 #include <iostream>
 // #include <iomanip> 
 
@@ -212,7 +213,7 @@ build_nlist_cell (std::vector<std::vector<int> > &	nlist0,
 	  diff[dd0] += shift[dd1] * boxt[3*dd1+dd0];
 	}
       }
-      double r2 = dot3(diff, diff);
+      double r2 = deepmd::dot3(diff, diff);
       if (r2 < rc02) {
 	if (i_idx < nloc) nlist0[i_idx].push_back (j_idx);
 	if (j_idx < nloc) nlist0[j_idx].push_back (i_idx);
@@ -253,7 +254,7 @@ build_nlist_cell (std::vector<std::vector<int> > &	nlist0,
 	  diff[dd0] += shift[dd1] * boxt[3*dd1+dd0];
 	}
       }
-      double r2 = dot3(diff, diff);
+      double r2 = deepmd::dot3(diff, diff);
       if (r2 < rc02) {
 	nlist0[i_idx].push_back (j_idx);
       }
@@ -611,7 +612,7 @@ build_nlist (std::vector<std::vector<int > > & nlist0,
 	diff[1] = posi3[jj*3+1] - posi3[ii*3+1];
 	diff[2] = posi3[jj*3+2] - posi3[ii*3+2];
       }
-      double r2 = dot3(diff, diff);
+      double r2 = deepmd::dot3(diff, diff);
       if (r2 < rc02) {
 	nlist0[ii].push_back (jj);
 	nlist0[jj].push_back (ii);
@@ -742,3 +743,135 @@ copy_coord (std::vector<double > & out_c,
   }
 }
 
+using namespace deepmd;
+
+void
+deepmd::
+convert_nlist(
+    InputNlist & to_nlist,
+    std::vector<std::vector<int> > & from_nlist
+    )
+{
+  to_nlist.inum = from_nlist.size();
+  for(int ii = 0; ii < to_nlist.inum; ++ii){
+    to_nlist.ilist[ii] = ii;
+    to_nlist.numneigh[ii] = from_nlist[ii].size();
+    to_nlist.firstneigh[ii] = &from_nlist[ii][0];
+  }
+}
+
+int
+deepmd::
+max_numneigh(
+    const InputNlist & nlist
+    )
+{
+  int max_num = 0;
+  for(int ii = 0; ii < nlist.inum; ++ii){
+    if(nlist.numneigh[ii] > max_num) max_num = nlist.numneigh[ii];
+  }
+  return max_num;
+}
+
+template <typename FPTYPE>
+int
+deepmd::
+build_nlist_cpu(
+    InputNlist & nlist,
+    int * max_list_size,
+    const FPTYPE * c_cpy,
+    const int & nloc, 
+    const int & nall, 
+    const int & mem_size_,
+    const float & rcut)
+{
+  const int mem_size = mem_size_;
+  *max_list_size = 0;
+  nlist.inum = nloc;
+  FPTYPE rcut2 = rcut * rcut;  
+  std::vector<int> jlist;
+  jlist.reserve(mem_size);  
+  for(int ii = 0; ii < nlist.inum; ++ii){
+    nlist.ilist[ii] = ii;
+    jlist.clear();
+    for(int jj = 0; jj < nall; ++jj){
+      if(jj == ii) continue;
+      FPTYPE diff[3];
+      for(int dd = 0; dd < 3; ++dd){
+	diff[dd] = c_cpy[ii*3+dd] - c_cpy[jj*3+dd];
+      }
+      FPTYPE diff2 = deepmd::dot3(diff, diff);
+      if(diff2 < rcut2){
+	jlist.push_back(jj);
+      }
+    }
+    if(jlist.size() > mem_size){
+      *max_list_size = jlist.size();
+      return 1;      
+    }
+    else {
+      int list_size = jlist.size();
+      nlist.numneigh[ii] = list_size;
+      if(list_size > *max_list_size) *max_list_size = list_size;
+      std::copy(jlist.begin(), jlist.end(), nlist.firstneigh[ii]);
+    }
+  }
+  return 0;
+}
+
+template
+int
+deepmd::
+build_nlist_cpu<double>(
+    InputNlist & nlist,
+    int * max_list_size,
+    const double * c_cpy,
+    const int & nloc, 
+    const int & nall, 
+    const int & mem_size,
+    const float & rcut);
+
+template
+int
+deepmd::
+build_nlist_cpu<float>(
+    InputNlist & nlist,
+    int * max_list_size,
+    const float * c_cpy,
+    const int & nloc, 
+    const int & nall, 
+    const int & mem_size,
+    const float & rcut);
+
+#if GOOGLE_CUDA
+void deepmd::convert_nlist_gpu_cuda(
+    InputNlist & gpu_nlist,
+    InputNlist & cpu_nlist,
+    int* & gpu_memory,
+    const int & max_nbor_size)
+{
+  const int inum = cpu_nlist.inum;
+  gpu_nlist.inum = inum;
+  malloc_device_memory(gpu_nlist.ilist, inum);
+  malloc_device_memory(gpu_nlist.numneigh, inum);
+  malloc_device_memory(gpu_nlist.firstneigh, inum);
+  memcpy_host_to_device(gpu_nlist.ilist, cpu_nlist.ilist, inum);
+  memcpy_host_to_device(gpu_nlist.numneigh, cpu_nlist.numneigh, inum);
+  int ** _firstneigh = NULL;
+  _firstneigh = (int**)malloc(sizeof(int*) * inum);
+  for (int ii = 0; ii < inum; ii++) {
+    memcpy_host_to_device(gpu_memory + ii * max_nbor_size, cpu_nlist.firstneigh[ii], cpu_nlist.numneigh[ii]);
+    _firstneigh[ii] = gpu_memory + ii * max_nbor_size;
+  }
+  memcpy_host_to_device(gpu_nlist.firstneigh, _firstneigh, inum);
+  free(_firstneigh);
+}
+
+void deepmd::free_nlist_gpu_cuda(
+    InputNlist & gpu_nlist)
+{
+  delete_device_memory(gpu_nlist.ilist);
+  delete_device_memory(gpu_nlist.numneigh);
+  delete_device_memory(gpu_nlist.firstneigh);
+}
+#endif // GOOGLE_CUDA

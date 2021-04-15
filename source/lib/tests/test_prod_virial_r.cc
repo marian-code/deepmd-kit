@@ -4,6 +4,7 @@
 #include "env_mat.h"
 #include "neighbor_list.h"
 #include "prod_virial.h"
+#include "device.h"
 
 class TestProdVirialR : public ::testing::Test
 {
@@ -61,13 +62,13 @@ protected:
     rij.resize(nloc * nnei * 3);
     for(int ii = 0; ii < nloc; ++ii){      
       // format nlist and record
-      format_nlist_cpu<double>(fmt_nlist_a, posi_cpy, ntypes, atype_cpy, ii, nlist_a_cpy[ii], rc, sec_a);
+      format_nlist_i_cpu<double>(fmt_nlist_a, posi_cpy, atype_cpy, ii, nlist_a_cpy[ii], rc, sec_a);
       for (int jj = 0; jj < nnei; ++jj){
 	nlist[ii*nnei + jj] = fmt_nlist_a[jj];
       }
       std::vector<double > t_env, t_env_deriv, t_rij;
       // compute env_mat and its deriv, record
-      env_mat_r_cpu<double>(t_env, t_env_deriv, t_rij, posi_cpy, ntypes, atype_cpy, ii, fmt_nlist_a, sec_a, rc_smth, rc);    
+      deepmd::env_mat_r_cpu<double>(t_env, t_env_deriv, t_rij, posi_cpy, atype_cpy, ii, fmt_nlist_a, sec_a, rc_smth, rc);    
       for (int jj = 0; jj < ndescrpt; ++jj){
 	env[ii*ndescrpt+jj] = t_env[jj];
 	for (int dd = 0; dd < 3; ++dd){
@@ -92,7 +93,7 @@ TEST_F(TestProdVirialR, cpu)
   std::vector<double> virial(9);
   std::vector<double> atom_virial(nall * 9);
   int n_a_sel = nnei;
-  prod_virial_r_cpu<double> (&virial[0], &atom_virial[0], &net_deriv[0], &env_deriv[0], &rij[0], &nlist[0], nloc, nall, nnei);
+  deepmd::prod_virial_r_cpu<double> (&virial[0], &atom_virial[0], &net_deriv[0], &env_deriv[0], &rij[0], &nlist[0], nloc, nall, nnei);
   EXPECT_EQ(virial.size(), 9);
   EXPECT_EQ(atom_virial.size(), nall * 9);  
   EXPECT_EQ(virial.size(), expected_virial.size());
@@ -111,3 +112,51 @@ TEST_F(TestProdVirialR, cpu)
   // }
   // printf("\n");
 }
+
+#if GOOGLE_CUDA
+TEST_F(TestProdVirialR, gpu_cuda)
+{
+  std::vector<double> virial(9, 0.0);
+  std::vector<double> atom_virial(nall * 9, 0.0);
+  int n_a_sel = nnei;
+
+  int * nlist_dev = NULL;
+  double * virial_dev = NULL, *atom_virial_dev = NULL, * net_deriv_dev = NULL, * env_deriv_dev = NULL, * rij_dev = NULL;
+
+  deepmd::malloc_device_memory_sync(nlist_dev, nlist);
+  deepmd::malloc_device_memory_sync(virial_dev, virial);
+  deepmd::malloc_device_memory_sync(atom_virial_dev, atom_virial);
+  deepmd::malloc_device_memory_sync(net_deriv_dev, net_deriv);  
+  deepmd::malloc_device_memory_sync(env_deriv_dev, env_deriv);  
+  deepmd::malloc_device_memory_sync(rij_dev, rij);  
+
+  deepmd::prod_virial_r_gpu_cuda<double> (virial_dev, atom_virial_dev, net_deriv_dev, env_deriv_dev, rij_dev, nlist_dev, nloc, nall, nnei);
+  
+  deepmd::memcpy_device_to_host(virial_dev, virial);
+  deepmd::memcpy_device_to_host(atom_virial_dev, atom_virial);
+  deepmd::delete_device_memory(nlist_dev);
+  deepmd::delete_device_memory(virial_dev);
+  deepmd::delete_device_memory(atom_virial_dev);
+  deepmd::delete_device_memory(net_deriv_dev);
+  deepmd::delete_device_memory(env_deriv_dev);
+  deepmd::delete_device_memory(rij_dev);
+  // virial are not calculated in gpu currently;
+  for (int ii = 0; ii < 9; ii++) {
+    virial[ii] = 0;
+  }
+  for (int ii = 0; ii < nall * 9; ii++) {
+    virial[ii % 9] += atom_virial[ii];
+  }
+
+  EXPECT_EQ(virial.size(), 9);
+  EXPECT_EQ(virial.size(), expected_virial.size());
+  EXPECT_EQ(atom_virial.size(), nall * 9);  
+  EXPECT_EQ(atom_virial.size(), expected_atom_virial.size());  
+  for (int jj = 0; jj < virial.size(); ++jj){
+    EXPECT_LT(fabs(virial[jj] - expected_virial[jj]) , 1e-5);
+  }  
+  for (int jj = 0; jj < atom_virial.size(); ++jj){
+    EXPECT_LT(fabs(atom_virial[jj] - expected_atom_virial[jj]) , 1e-5);
+  }
+}
+#endif // GOOGLE_CUDA
